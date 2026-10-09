@@ -1,0 +1,87 @@
+name: terraform
+
+on:
+  pull_request:
+    branches: [main, prod]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yaml'
+  push:
+    branches: [main, prod]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yaml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to target
+        type: choice
+        options: [dev, prod]
+        default: dev
+      action:
+        description: Terraform action to run
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # main branch -> dev project, prod branch -> prod project.
+      - name: Resolve environment
+        id: cfg
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ inputs.environment }}"
+          else
+            BRANCH="${{ github.base_ref || github.ref_name }}"
+            [ "$BRANCH" = "prod" ] && ENV="prod" || ENV="dev"
+          fi
+
+          if [ "$ENV" = "prod" ]; then
+            echo "dir=terraform/envs/prod" >> "$GITHUB_OUTPUT"
+            echo "wif=projects/539914233785/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
+            echo "sa=infra-ci@storycover-prod.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=terraform/envs/dev" >> "$GITHUB_OUTPUT"
+            echo "wif=projects/87639016657/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
+            echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
+          fi
+          echo "env=$ENV" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ steps.cfg.outputs.wif }}
+          service_account: ${{ steps.cfg.outputs.sa }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: terraform init -input=false
+
+      # Pull requests only ever plan.
+      - name: Plan
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan')
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: terraform plan -input=false -no-color
+
+      # Merge to main -> apply dev; merge main into prod -> apply prod.
+      - name: Apply
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: terraform apply -input=false -auto-approve -no-color
+
+      # Controlled teardown, manual trigger only.
+      - name: Destroy
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: terraform destroy -input=false -auto-approve -no-color
