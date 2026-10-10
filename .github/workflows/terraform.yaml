@@ -79,6 +79,8 @@ jobs:
   plan:
     needs: [config, validate]
     runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -86,15 +88,22 @@ jobs:
           workload_identity_provider: ${{ needs.config.outputs.wif }}
           service_account: ${{ needs.config.outputs.sa }}
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
       - name: Plan
+        id: plan
         run: |
           terraform init -backend-config="envs/${{ needs.config.outputs.env }}.backend.hcl" -input=false
-          terraform plan -var-file="envs/${{ needs.config.outputs.env }}.tfvars" -input=false -no-color
+          set +e
+          terraform plan -var-file="envs/${{ needs.config.outputs.env }}.tfvars" -input=false -no-color -detailed-exitcode
+          code=$?
+          set -e
+          if [ "$code" = "2" ]; then echo "changes=true" >> "$GITHUB_OUTPUT"; elif [ "$code" = "0" ]; then echo "changes=false" >> "$GITHUB_OUTPUT"; else exit "$code"; fi
 
   # Apply only on merges (push) or an explicit manual apply. Gated by Environment approval.
   apply:
     needs: [config, plan]
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')) && needs.plan.outputs.changes == 'true'
     runs-on: ubuntu-latest
     environment: ${{ needs.config.outputs.env }}
     steps:

@@ -1,4 +1,4 @@
-# Vault: single-replica Raft, KMS auto-unseal via Workload Identity, on the management pool.
+# Vault: single-replica Raft, KMS auto-unseal; values are dev-scoped (prod needs per-env override).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

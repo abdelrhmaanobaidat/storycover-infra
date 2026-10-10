@@ -26,6 +26,13 @@ resource "google_kms_crypto_key_iam_member" "vault_unseal" {
   member        = "serviceAccount:${google_service_account.vault.email}"
 }
 
+# gcpckms seal also needs cloudkms.cryptoKeys.get to verify the key exists at startup.
+resource "google_kms_crypto_key_iam_member" "vault_viewer" {
+  crypto_key_id = google_kms_crypto_key.vault_unseal.id
+  role          = "roles/cloudkms.viewer"
+  member        = "serviceAccount:${google_service_account.vault.email}"
+}
+
 # Workload Identity: the in-cluster KSA vault/vault acts as the Vault GCP SA.
 resource "google_service_account_iam_member" "vault_wi" {
   service_account_id = google_service_account.vault.name
