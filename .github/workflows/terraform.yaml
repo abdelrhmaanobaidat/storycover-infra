@@ -36,6 +36,7 @@ jobs:
   config:
     runs-on: ubuntu-latest
     outputs:
+      env: ${{ steps.cfg.outputs.env }}
       dir: ${{ steps.cfg.outputs.dir }}
       wif: ${{ steps.cfg.outputs.wif }}
       sa: ${{ steps.cfg.outputs.sa }}
@@ -58,6 +59,7 @@ jobs:
             echo "wif=projects/87639016657/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
             echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
           fi
+          echo "env=$ENV" >> "$GITHUB_OUTPUT"
 
   # fmt + validate for both environments. No cloud access (backend disabled).
   validate:
@@ -96,6 +98,8 @@ jobs:
     needs: [config, plan]
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
     runs-on: ubuntu-latest
+    # Pauses for manual approval (required reviewer on the GitHub Environment) before applying.
+    environment: ${{ needs.config.outputs.env }}
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
