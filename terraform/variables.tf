@@ -38,3 +38,40 @@ variable "release_channel" {
   type    = string
   default = "REGULAR"
 }
+
+# Management node pool (on-demand). Totals are region-wide (not per-zone).
+variable "mgmt_machine_type" {
+  type    = string
+  default = "e2-standard-2"
+}
+
+variable "mgmt_min_nodes" {
+  type    = number
+  default = 1
+}
+
+variable "mgmt_max_nodes" {
+  type    = number
+  default = 2
+}
+
+# Application node pool (Spot).
+variable "app_machine_type" {
+  type    = string
+  default = "e2-small"
+}
+
+variable "app_spot" {
+  type    = bool
+  default = true
+}
+
+variable "app_min_nodes" {
+  type    = number
+  default = 1
+}
+
+variable "app_max_nodes" {
+  type    = number
+  default = 3
+}
