@@ -15,8 +15,8 @@ variable "name" {
 
 variable "argocd_chart_version" {
   type        = string
-  default     = ""
-  description = "argo-cd Helm chart version. Empty = latest; pin once confirmed."
+  default     = "10.10.2"
+  description = "argo-cd Helm chart version (pinned for reproducible bootstraps)."
 }
 
 variable "gitops_repo_url" {
