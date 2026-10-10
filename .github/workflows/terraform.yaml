@@ -28,33 +28,10 @@ permissions:
   contents: read
   id-token: write
 
+# Branches (PRs): config -> validate -> plan.
+# Merges (push):  config -> validate -> plan -> apply.
 jobs:
-  # Phase 1 - formatting. No cloud access needed.
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - name: Format check
-        working-directory: terraform
-        run: terraform fmt -check -recursive
-
-  # Phase 2 - config validity for both environments. No cloud access (backend disabled).
-  validate:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - name: Validate
-        run: |
-          for d in dev prod; do
-            echo "== $d =="
-            terraform -chdir="terraform/envs/$d" init -backend=false -input=false
-            terraform -chdir="terraform/envs/$d" validate -no-color
-          done
-
-  # Single source of the per-environment directory, WIF provider and service account.
+  # init/config: resolve which environment this run targets.
   # main branch -> dev project, prod branch -> prod project.
   config:
     runs-on: ubuntu-latest
@@ -82,10 +59,27 @@ jobs:
             echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
           fi
 
-  # Phase 3 - plan. Pull requests, or a manual plan.
+  # fmt + validate for both environments. No cloud access (backend disabled).
+  validate:
+    needs: config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Format check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+      - name: Validate
+        run: |
+          for d in dev prod; do
+            echo "== $d =="
+            terraform -chdir="terraform/envs/$d" init -backend=false -input=false
+            terraform -chdir="terraform/envs/$d" validate -no-color
+          done
+
+  # Plan on every run - the preview on PRs and the gate before apply on merges.
   plan:
-    needs: [validate, config]
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan')
+    needs: [config, validate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -97,9 +91,9 @@ jobs:
       - run: terraform -chdir="${{ needs.config.outputs.dir }}" init -input=false
       - run: terraform -chdir="${{ needs.config.outputs.dir }}" plan -input=false -no-color
 
-  # Phase 4 - apply. Merge to main => dev, merge main->prod => prod (or a manual apply).
+  # Apply only on merges (push) or an explicit manual apply. Runs after plan.
   apply:
-    needs: [validate, config]
+    needs: [config, plan]
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
     runs-on: ubuntu-latest
     steps:
