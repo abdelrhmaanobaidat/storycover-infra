@@ -5,7 +5,7 @@ variable "project_id" {
 
 variable "location" {
   type        = string
-  description = "A zone for a zonal cluster (dev) or a region for a regional cluster (prod)."
+  description = "Region for the Autopilot cluster (Autopilot clusters are regional)."
 }
 
 variable "cluster_name" {
@@ -41,39 +41,4 @@ variable "master_ipv4_cidr" {
 variable "release_channel" {
   type    = string
   default = "REGULAR"
-}
-
-variable "mgmt_machine_type" {
-  type    = string
-  default = "e2-standard-2"
-}
-
-variable "mgmt_min_nodes" {
-  type    = number
-  default = 1
-}
-
-variable "mgmt_max_nodes" {
-  type    = number
-  default = 2
-}
-
-variable "app_machine_type" {
-  type    = string
-  default = "e2-small"
-}
-
-variable "app_spot" {
-  type    = bool
-  default = true
-}
-
-variable "app_min_nodes" {
-  type    = number
-  default = 1
-}
-
-variable "app_max_nodes" {
-  type    = number
-  default = 3
 }

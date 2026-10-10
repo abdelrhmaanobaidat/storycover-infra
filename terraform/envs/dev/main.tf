@@ -13,7 +13,7 @@ module "gke" {
   source = "../../modules/gke"
 
   project_id   = var.project_id
-  location     = var.zone
+  location     = var.region
   cluster_name = "storycover-dev"
 
   network             = module.network.network_name
