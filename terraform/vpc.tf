@@ -1,12 +1,12 @@
 resource "google_compute_network" "vpc" {
-  name                    = var.network_name
+  name                    = var.name
   project                 = var.project_id
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
 }
 
 resource "google_compute_subnetwork" "subnet" {
-  name                     = "${var.network_name}-subnet"
+  name                     = "${var.name}-subnet"
   project                  = var.project_id
   region                   = var.region
   network                  = google_compute_network.vpc.id
@@ -25,14 +25,14 @@ resource "google_compute_subnetwork" "subnet" {
 }
 
 resource "google_compute_router" "router" {
-  name    = "${var.network_name}-router"
+  name    = "${var.name}-router"
   project = var.project_id
   region  = var.region
   network = google_compute_network.vpc.id
 }
 
 resource "google_compute_router_nat" "nat" {
-  name                               = "${var.network_name}-nat"
+  name                               = "${var.name}-nat"
   project                            = var.project_id
   region                             = var.region
   router                             = google_compute_router.router.name
@@ -47,7 +47,7 @@ resource "google_compute_router_nat" "nat" {
 
 # Internal east-west traffic between nodes, pods and services.
 resource "google_compute_firewall" "allow_internal" {
-  name      = "${var.network_name}-allow-internal"
+  name      = "${var.name}-allow-internal"
   project   = var.project_id
   network   = google_compute_network.vpc.id
   direction = "INGRESS"
@@ -67,7 +67,7 @@ resource "google_compute_firewall" "allow_internal" {
 
 # Google front-end ranges used by the external load balancer health checks.
 resource "google_compute_firewall" "allow_health_checks" {
-  name          = "${var.network_name}-allow-health-checks"
+  name          = "${var.name}-allow-health-checks"
   project       = var.project_id
   network       = google_compute_network.vpc.id
   direction     = "INGRESS"
@@ -80,7 +80,7 @@ resource "google_compute_firewall" "allow_health_checks" {
 
 # IAP range, so admins can SSH to nodes without any public IP on the node.
 resource "google_compute_firewall" "allow_iap_ssh" {
-  name          = "${var.network_name}-allow-iap-ssh"
+  name          = "${var.name}-allow-iap-ssh"
   project       = var.project_id
   network       = google_compute_network.vpc.id
   direction     = "INGRESS"

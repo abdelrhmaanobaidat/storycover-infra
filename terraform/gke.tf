@@ -2,18 +2,18 @@
 # defaults, auto-scaling/repair/upgrade are built in). Management vs application workloads
 # are separated by namespace, not node pool.
 resource "google_container_cluster" "this" {
-  name     = var.cluster_name
+  name     = var.name
   project  = var.project_id
-  location = var.location
+  location = var.region
 
   enable_autopilot = true
 
-  network    = var.network
-  subnetwork = var.subnetwork
+  network    = google_compute_network.vpc.name
+  subnetwork = google_compute_subnetwork.subnet.name
 
   ip_allocation_policy {
-    cluster_secondary_range_name  = var.pods_range_name
-    services_secondary_range_name = var.services_range_name
+    cluster_secondary_range_name  = "pods"
+    services_secondary_range_name = "services"
   }
 
   release_channel {
