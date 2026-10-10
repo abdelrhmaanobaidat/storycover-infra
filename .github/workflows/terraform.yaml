@@ -28,15 +28,13 @@ permissions:
   contents: read
   id-token: write
 
-# Branches (PRs): config -> validate -> plan.
-# Merges (push):  config -> validate -> plan -> apply (apply gated by Environment approval).
+# PRs: config -> validate -> plan. Merges: + apply (gated by Environment approval).
 defaults:
   run:
     working-directory: terraform
 
 jobs:
-  # init/config: resolve which environment this run targets.
-  # main branch -> dev project, prod branch -> prod project.
+  # Resolve the target environment: main -> dev project, prod -> prod project.
   config:
     runs-on: ubuntu-latest
     outputs:

@@ -5,6 +5,7 @@ on:
     branches: [main, prod]
     paths:
       - 'terraform-platform/**'
+      - 'gitops/**'
       - '.github/workflows/platform.yaml'
   push:
     branches: [main, prod]
@@ -28,8 +29,7 @@ permissions:
   contents: read
   id-token: write
 
-# In-cluster layer (Argo CD via Helm over Connect Gateway). Applied AFTER the infra root
-# has created the cluster. Branches: config -> validate -> plan. Merges: + apply (gated).
+# In-cluster layer (Argo CD via Helm over Connect Gateway); applied after the infra root creates the cluster.
 defaults:
   run:
     working-directory: terraform-platform

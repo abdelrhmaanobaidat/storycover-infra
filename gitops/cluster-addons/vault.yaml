@@ -1,0 +1,63 @@
+# Vault: single-replica Raft, KMS auto-unseal via Workload Identity, on the management pool.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    chart: vault
+    targetRevision: 0.34.1
+    helm:
+      releaseName: vault
+      values: |
+        global:
+          tlsDisable: true
+        injector:
+          enabled: false
+        server:
+          nodeSelector:
+            workload: management
+          serviceAccount:
+            create: true
+            name: vault
+            annotations:
+              iam.gke.io/gcp-service-account: storycover-dev-vault@storycover-dev.iam.gserviceaccount.com
+          dataStorage:
+            enabled: true
+            size: 1Gi
+          ha:
+            enabled: true
+            replicas: 1
+            raft:
+              enabled: true
+              setNodeId: true
+              config: |
+                ui = true
+                listener "tcp" {
+                  address         = "[::]:8200"
+                  cluster_address = "[::]:8201"
+                  tls_disable     = 1
+                }
+                storage "raft" {
+                  path = "/vault/data"
+                }
+                seal "gcpckms" {
+                  project    = "storycover-dev"
+                  region     = "me-central1"
+                  key_ring   = "storycover-dev-vault"
+                  crypto_key = "vault-unseal"
+                }
+                service_registration "kubernetes" {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
