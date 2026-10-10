@@ -21,7 +21,7 @@ on:
       action:
         description: Terraform action to run
         type: choice
-        options: [plan, apply, destroy]
+        options: [plan, apply]
         default: plan
 
 permissions:
@@ -119,31 +119,3 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" init -input=false
       - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" apply -input=false -auto-approve -no-color
-
-  # Manual-only teardown.
-  destroy:
-    needs: validate
-    if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Resolve environment
-        id: cfg
-        run: |
-          ENV="${{ inputs.environment }}"
-          if [ "$ENV" = "prod" ]; then
-            echo "dir=terraform/envs/prod" >> "$GITHUB_OUTPUT"
-            echo "wif=projects/539914233785/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
-            echo "sa=infra-ci@storycover-prod.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
-          else
-            echo "dir=terraform/envs/dev" >> "$GITHUB_OUTPUT"
-            echo "wif=projects/87639016657/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
-            echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ steps.cfg.outputs.wif }}
-          service_account: ${{ steps.cfg.outputs.sa }}
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" init -input=false
-      - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" destroy -input=false -auto-approve -no-color
