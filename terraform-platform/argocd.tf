@@ -1,8 +1,4 @@
-# Argo CD is the only thing Terraform installs in-cluster. Two releases, ordered:
-#   1) argo-cd      — the engine + its CRDs (wait=true, so CRDs are Established)
-#   2) app-of-apps  — the root Application (separate release, depends_on #1), so the
-#      Application CR is only applied AFTER its CRD exists (avoids the CRD race).
-# After this, Argo CD manages everything else from Git (gitops/cluster-addons).
+# Two ordered releases: argo-cd (engine + CRDs, wait=true) then the app-of-apps root (depends_on, so the Application CR applies after its CRD exists).
 resource "helm_release" "argocd" {
   name             = "argocd"
   namespace        = "argocd"

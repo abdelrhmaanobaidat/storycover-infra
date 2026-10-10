@@ -1,11 +1,6 @@
-# Cloud KMS key for Vault auto-unseal, and the Vault server's GCP identity.
-# Vault runs in-cluster (namespace/SA: vault/vault) and uses Workload Identity to call KMS
-# for seal/unseal — no key files, no unseal keys to babysit.
-#
-# Note: KMS key rings and keys cannot be deleted (only key versions destroyed), so
-# `terraform destroy` removes them from state but leaves them in the project. A re-apply
-# reuses the same names. Acceptable for a disposable, short-lived environment.
+# Cloud KMS auto-unseal key + Vault GCP identity (Workload Identity for KSA vault/vault).
 
+# KMS key rings/keys can't be deleted; destroy removes from state but leaves them in GCP.
 resource "google_kms_key_ring" "vault" {
   name     = "${var.name}-vault"
   location = var.region

@@ -53,8 +53,7 @@ resource "google_container_cluster" "this" {
     master_ipv4_cidr_block  = var.master_ipv4_cidr
   }
 
-  # Private endpoint requires authorized networks enabled; no external CIDRs (operators
-  # use Connect Gateway, nodes reach it internally).
+  # Private endpoint requires authorized networks enabled; no external CIDRs (we use Connect Gateway).
   master_authorized_networks_config {}
 
   workload_identity_config {
@@ -69,8 +68,7 @@ resource "google_container_cluster" "this" {
   deletion_protection = false
 }
 
-# Management pool: on-demand, UNTAINTED so kube-system + platform tools (Argo CD, Vault,
-# monitoring) schedule here. Labelled for nodeSelector pinning.
+# Management pool: on-demand, untainted so kube-system + platform tools schedule here.
 resource "google_container_node_pool" "management" {
   name     = "management"
   project  = var.project_id
@@ -108,8 +106,7 @@ resource "google_container_node_pool" "management" {
   }
 }
 
-# Application pool: Spot + autoscaling, TAINTED so only app workloads (with a matching
-# toleration) land here. This is the management/application segregation (Objective 1).
+# Application pool: Spot, autoscaling, tainted so only app workloads (with toleration) land here.
 resource "google_container_node_pool" "application" {
   name     = "application"
   project  = var.project_id

@@ -10,9 +10,7 @@ data "google_project" "this" {
 }
 
 locals {
-  # Connect Gateway endpoint for the cluster's fleet membership (membership id = cluster
-  # name). Lets the Helm provider reach the private control plane with a short-lived token,
-  # IP-independent — the same path operators use via `gcloud ... get-credentials`.
+  # Connect Gateway endpoint (membership id = cluster name) — reaches the private API with a short-lived token.
   gateway_host = "https://${var.region}-connectgateway.googleapis.com/v1/projects/${data.google_project.this.number}/locations/${var.region}/gkeMemberships/${var.name}"
 }
 
