@@ -54,13 +54,15 @@ jobs:
             terraform -chdir="terraform/envs/$d" validate -no-color
           done
 
-  # Phase 3 - plan. Pull requests, or a manual plan.
-  plan:
-    needs: validate
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan')
+  # Single source of the per-environment directory, WIF provider and service account.
+  # main branch -> dev project, prod branch -> prod project.
+  config:
     runs-on: ubuntu-latest
+    outputs:
+      dir: ${{ steps.cfg.outputs.dir }}
+      wif: ${{ steps.cfg.outputs.wif }}
+      sa: ${{ steps.cfg.outputs.sa }}
     steps:
-      - uses: actions/checkout@v4
       - name: Resolve environment
         id: cfg
         run: |
@@ -79,43 +81,33 @@ jobs:
             echo "wif=projects/87639016657/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
             echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
           fi
+
+  # Phase 3 - plan. Pull requests, or a manual plan.
+  plan:
+    needs: [validate, config]
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ steps.cfg.outputs.wif }}
-          service_account: ${{ steps.cfg.outputs.sa }}
+          workload_identity_provider: ${{ needs.config.outputs.wif }}
+          service_account: ${{ needs.config.outputs.sa }}
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" init -input=false
-      - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" plan -input=false -no-color
+      - run: terraform -chdir="${{ needs.config.outputs.dir }}" init -input=false
+      - run: terraform -chdir="${{ needs.config.outputs.dir }}" plan -input=false -no-color
 
   # Phase 4 - apply. Merge to main => dev, merge main->prod => prod (or a manual apply).
   apply:
-    needs: validate
+    needs: [validate, config]
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Resolve environment
-        id: cfg
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV="${{ inputs.environment }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-            [ "$BRANCH" = "prod" ] && ENV="prod" || ENV="dev"
-          fi
-          if [ "$ENV" = "prod" ]; then
-            echo "dir=terraform/envs/prod" >> "$GITHUB_OUTPUT"
-            echo "wif=projects/539914233785/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
-            echo "sa=infra-ci@storycover-prod.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
-          else
-            echo "dir=terraform/envs/dev" >> "$GITHUB_OUTPUT"
-            echo "wif=projects/87639016657/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
-            echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
-          fi
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ steps.cfg.outputs.wif }}
-          service_account: ${{ steps.cfg.outputs.sa }}
+          workload_identity_provider: ${{ needs.config.outputs.wif }}
+          service_account: ${{ needs.config.outputs.sa }}
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" init -input=false
-      - run: terraform -chdir="${{ steps.cfg.outputs.dir }}" apply -input=false -auto-approve -no-color
+      - run: terraform -chdir="${{ needs.config.outputs.dir }}" init -input=false
+      - run: terraform -chdir="${{ needs.config.outputs.dir }}" apply -input=false -auto-approve -no-color
