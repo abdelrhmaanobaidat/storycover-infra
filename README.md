@@ -13,9 +13,14 @@ managed by Terraform through the pipeline.
 ## Layout
 
     terraform/
-      modules/        reusable modules (network, gke, gcs, edge, iam, kms)
-      envs/dev        dev environment (zonal cluster, me-central1-a)
-      envs/prod       prod environment (regional cluster)
+      vpc.tf gke.tf ... outputs.tf    one flat root, one file per concern
+      variables.tf providers.tf versions.tf backend.tf (partial) moved.tf
+      envs/
+        dev.tfvars   dev.backend.hcl   per-env values + state location
+        prod.tfvars  prod.backend.hcl
+
+One root config serves both environments; `envs/<env>.tfvars` supplies the values and
+`envs/<env>.backend.hcl` selects the per-project state bucket at `init` time.
 
 ## State
 
@@ -26,9 +31,9 @@ Remote state in GCS, one bucket per environment:
 
 ## Usage
 
-    cd terraform/envs/dev
-    terraform init
-    terraform plan
-    terraform apply
+    cd terraform
+    terraform init  -backend-config=envs/dev.backend.hcl
+    terraform plan  -var-file=envs/dev.tfvars
+    # applies run in CI (merge), gated by Environment approval
 
 Region: `me-central1` (Doha). Project per environment: `storycover-dev`, `storycover-prod`.

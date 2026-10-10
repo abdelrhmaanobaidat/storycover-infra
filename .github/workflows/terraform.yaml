@@ -29,7 +29,11 @@ permissions:
   id-token: write
 
 # Branches (PRs): config -> validate -> plan.
-# Merges (push):  config -> validate -> plan -> apply.
+# Merges (push):  config -> validate -> plan -> apply (apply gated by Environment approval).
+defaults:
+  run:
+    working-directory: terraform
+
 jobs:
   # init/config: resolve which environment this run targets.
   # main branch -> dev project, prod branch -> prod project.
@@ -37,12 +41,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       env: ${{ steps.cfg.outputs.env }}
-      dir: ${{ steps.cfg.outputs.dir }}
       wif: ${{ steps.cfg.outputs.wif }}
       sa: ${{ steps.cfg.outputs.sa }}
     steps:
       - name: Resolve environment
         id: cfg
+        working-directory: .
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV="${{ inputs.environment }}"
@@ -50,18 +54,16 @@ jobs:
             BRANCH="${{ github.base_ref || github.ref_name }}"
             [ "$BRANCH" = "prod" ] && ENV="prod" || ENV="dev"
           fi
+          echo "env=$ENV" >> "$GITHUB_OUTPUT"
           if [ "$ENV" = "prod" ]; then
-            echo "dir=terraform/envs/prod" >> "$GITHUB_OUTPUT"
             echo "wif=projects/539914233785/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
             echo "sa=infra-ci@storycover-prod.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
           else
-            echo "dir=terraform/envs/dev" >> "$GITHUB_OUTPUT"
             echo "wif=projects/87639016657/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> "$GITHUB_OUTPUT"
             echo "sa=infra-ci@storycover-dev.iam.gserviceaccount.com" >> "$GITHUB_OUTPUT"
           fi
-          echo "env=$ENV" >> "$GITHUB_OUTPUT"
 
-  # fmt + validate for both environments. No cloud access (backend disabled).
+  # fmt + validate. No cloud access (backend disabled).
   validate:
     needs: config
     runs-on: ubuntu-latest
@@ -69,15 +71,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
       - name: Format check
-        working-directory: terraform
         run: terraform fmt -check -recursive
       - name: Validate
         run: |
-          for d in dev prod; do
-            echo "== $d =="
-            terraform -chdir="terraform/envs/$d" init -backend=false -input=false
-            terraform -chdir="terraform/envs/$d" validate -no-color
-          done
+          terraform init -backend=false -input=false
+          terraform validate -no-color
 
   # Plan on every run - the preview on PRs and the gate before apply on merges.
   plan:
@@ -90,15 +88,16 @@ jobs:
           workload_identity_provider: ${{ needs.config.outputs.wif }}
           service_account: ${{ needs.config.outputs.sa }}
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir="${{ needs.config.outputs.dir }}" init -input=false
-      - run: terraform -chdir="${{ needs.config.outputs.dir }}" plan -input=false -no-color
+      - name: Plan
+        run: |
+          terraform init -backend-config="envs/${{ needs.config.outputs.env }}.backend.hcl" -input=false
+          terraform plan -var-file="envs/${{ needs.config.outputs.env }}.tfvars" -input=false -no-color
 
-  # Apply only on merges (push) or an explicit manual apply. Runs after plan.
+  # Apply only on merges (push) or an explicit manual apply. Gated by Environment approval.
   apply:
     needs: [config, plan]
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
     runs-on: ubuntu-latest
-    # Pauses for manual approval (required reviewer on the GitHub Environment) before applying.
     environment: ${{ needs.config.outputs.env }}
     steps:
       - uses: actions/checkout@v4
@@ -107,5 +106,7 @@ jobs:
           workload_identity_provider: ${{ needs.config.outputs.wif }}
           service_account: ${{ needs.config.outputs.sa }}
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir="${{ needs.config.outputs.dir }}" init -input=false
-      - run: terraform -chdir="${{ needs.config.outputs.dir }}" apply -input=false -auto-approve -no-color
+      - name: Apply
+        run: |
+          terraform init -backend-config="envs/${{ needs.config.outputs.env }}.backend.hcl" -input=false
+          terraform apply -var-file="envs/${{ needs.config.outputs.env }}.tfvars" -input=false -auto-approve -no-color
