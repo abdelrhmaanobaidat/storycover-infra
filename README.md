@@ -2,6 +2,14 @@
 
 Terraform and platform configuration for the StoryCover GKE environments.
 
+## Prerequisite (one-time bootstrap)
+
+Before the pipeline can run, each project needs a bootstrap layer that the pipeline
+cannot create for itself (it authenticates *with* these): a GCS state bucket, a Workload
+Identity provider, and the `infra-ci` service account. These are provisioned once, by
+hand, with `gcloud`; the bootstrap script is kept out of this repo. Everything else is
+managed by Terraform through the pipeline.
+
 ## Layout
 
     terraform/
