@@ -9,7 +9,3 @@ output "subnet_name" {
 output "cluster_name" {
   value = module.gke.cluster_name
 }
-
-output "node_service_account" {
-  value = module.gke.node_service_account
-}
