@@ -1,0 +1,39 @@
+# Two tenancy fences so platform and app deployments can't stray outside their lane.
+# Created before anything references them.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  description: Cluster platform (Vault, VSO, future addons) from the infra repo.
+  sourceRepos:
+    - https://github.com/abdelrhmaanobaidat/storycover-infra.git
+    - https://helm.releases.hashicorp.com
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  description: StoryCover app from the config repo, confined to its own namespace.
+  sourceRepos:
+    - https://github.com/abdelrhmaanobaidat/storycover-config.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: storycover
+  # Namespaced resources only; no cluster-scoped resources from the app.
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
