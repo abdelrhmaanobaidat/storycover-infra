@@ -10,7 +10,7 @@ data "google_project" "this" {
 }
 
 locals {
-  # Connect Gateway endpoint (membership id = cluster name) — reaches the private API with a short-lived token.
+  # Connect Gateway endpoint (membership id = cluster name); reaches the private API with a short-lived token.
   gateway_host = "https://${var.region}-connectgateway.googleapis.com/v1/projects/${data.google_project.this.number}/locations/${var.region}/gkeMemberships/${var.name}"
 }
 

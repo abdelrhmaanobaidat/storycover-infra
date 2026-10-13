@@ -4,7 +4,7 @@ One-time Vault bootstrap (run by a human after Vault is up). Vault *server* conf
 scripted here for reproducibility; the *secret values* are never committed.
 
 ## Steps (per environment)
-1. **Initialize** (one-time; produces the recovery key + root token — store them safely,
+1. **Initialize** (one-time; produces the recovery key + root token, stored safely,
    never in Git):
 
        kubectl -n vault exec -i vault-0 -- vault operator init \

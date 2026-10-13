@@ -8,5 +8,5 @@ Desired state that Argo CD reconciles (app-of-apps pattern).
 - `cluster-addons/` holds the **child Argo Applications** for the platform add-ons
   (Vault, Vault Secrets Operator, kube-prometheus-stack, Loki, the Gateway/edge, …).
 
-The StoryCover application itself is **not** here — it lives in the `storycover-config`
+The StoryCover application itself is **not** here; it lives in the `storycover-config`
 repo (Kustomize) and has its own Argo Application.
