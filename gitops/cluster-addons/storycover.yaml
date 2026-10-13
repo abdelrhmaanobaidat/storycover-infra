@@ -1,0 +1,34 @@
+# StoryCover app: Argo watches the config repo (dev overlay on main) and reconciles it.
+# Wave 5 so it lands after the namespace and VaultStaticSecret from vault-secrets.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: storycover
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: apps
+  source:
+    repoURL: https://github.com/abdelrhmaanobaidat/storycover-config.git
+    targetRevision: main
+    path: overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: storycover
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  # The HPA owns replica count; don't let selfHeal revert its scaling.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
