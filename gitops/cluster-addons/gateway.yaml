@@ -1,0 +1,87 @@
+# Edge: global external HTTPS LB via Gateway API. The static IP, managed cert map, and Cloud
+# Armor policy are created in Terraform (edge.tf); these resolve by name once it applies.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: storycover
+  namespace: storycover
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+    networking.gke.io/certmap: storycover-edge
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  addresses:
+    - type: NamedAddress
+      value: storycover-edge
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# Send all plaintext traffic to HTTPS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: storycover-redirect
+  namespace: storycover
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  parentRefs:
+    - name: storycover
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+# Serve the app on HTTPS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: storycover
+  namespace: storycover
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  parentRefs:
+    - name: storycover
+      sectionName: https
+  rules:
+    - backendRefs:
+        - name: storycover
+          port: 80
+---
+# Attach Cloud Armor + Cloud CDN to the app's backend service.
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: storycover
+  namespace: storycover
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: storycover
+  default:
+    securityPolicy: storycover-edge
+    logging:
+      enabled: true
+    cdn:
+      enabled: true
+      cacheMode: CACHE_ALL_STATIC

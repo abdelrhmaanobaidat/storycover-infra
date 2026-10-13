@@ -60,6 +60,11 @@ resource "google_container_cluster" "this" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
+  # Enable the GKE Gateway controller (edge uses Gateway API, not nginx).
+  gateway_api_config {
+    channel = "CHANNEL_STANDARD"
+  }
+
   # Connect Gateway (IAM-based, IP-independent) for the private control plane.
   fleet {
     project = var.project_id
