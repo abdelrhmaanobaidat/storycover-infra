@@ -16,5 +16,11 @@ with `argocd.argoproj.io/sync-wave`.
 - `gateway.yaml` (wave 6): the Gateway API edge. A `gke-l7-global-external-managed` Gateway
   (static IP and managed cert from `terraform/edge.tf`), an HTTP-to-HTTPS redirect, the HTTPS
   route to the app, and a `GCPBackendPolicy` attaching Cloud Armor and Cloud CDN.
+- `monitoring.yaml` (wave 10): kube-prometheus-stack (Prometheus, Grafana, Alertmanager) on
+  the management pool. Includes the app ServiceMonitor (scrapes `storycover` `/metrics`) and
+  alert rules (target down, 5xx rate, p95 latency), plus a Grafana data source for Loki.
+- `loki.yaml` (wave 10): Loki (single binary, ephemeral) and Promtail. Promtail tolerates the
+  app taint so it collects logs from the application pool too.
 
-Still to land here: kube-prometheus-stack + Loki.
+All addons are deployed. Storage for Prometheus/Loki is ephemeral (dev); prod would use
+persistent volumes or object storage.
