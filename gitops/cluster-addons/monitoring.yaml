@@ -1,0 +1,124 @@
+# Metrics: kube-prometheus-stack (Prometheus, Grafana, Alertmanager) on the management pool.
+# Trimmed for the dev cluster; ephemeral storage. The app ServiceMonitor and alert rules are
+# embedded here so they land with the chart (after its CRDs), avoiding a CRD-timing race.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 92.6.0
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |
+        prometheusOperator:
+          nodeSelector:
+            workload: management
+          admissionWebhooks:
+            patch:
+              nodeSelector:
+                workload: management
+        kube-state-metrics:
+          nodeSelector:
+            workload: management
+        prometheus-node-exporter:
+          tolerations:
+            - operator: Exists
+        alertmanager:
+          alertmanagerSpec:
+            nodeSelector:
+              workload: management
+            replicas: 1
+            resources:
+              requests:
+                cpu: 10m
+                memory: 32Mi
+        grafana:
+          nodeSelector:
+            workload: management
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          sidecar:
+            dashboards:
+              enabled: true
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://loki.monitoring.svc:3100
+        prometheus:
+          prometheusSpec:
+            nodeSelector:
+              workload: management
+            retention: 24h
+            resources:
+              requests:
+                cpu: 150m
+                memory: 400Mi
+              limits:
+                memory: 900Mi
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+          additionalServiceMonitors:
+            - name: storycover
+              namespaceSelector:
+                matchNames:
+                  - storycover
+              selector:
+                matchLabels:
+                  app: storycover
+              endpoints:
+                - port: http
+                  path: /metrics
+                  interval: 30s
+        additionalPrometheusRulesMap:
+          storycover:
+            groups:
+              - name: storycover
+                rules:
+                  - alert: StorycoverTargetDown
+                    expr: up{namespace="storycover", service="storycover"} == 0
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: StoryCover is not being scraped (target down)
+                  - alert: StorycoverHighErrorRate
+                    expr: |
+                      sum(rate(http_requests_total{namespace="storycover", status=~"5.."}[5m]))
+                        /
+                      sum(rate(http_requests_total{namespace="storycover"}[5m])) > 0.1
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: StoryCover 5xx error rate is above 10%
+                  - alert: StorycoverHighLatency
+                    expr: |
+                      histogram_quantile(0.95,
+                        sum(rate(http_request_duration_seconds_bucket{namespace="storycover", path!="/api/generate"}[5m])) by (le, path)
+                      ) > 2
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: StoryCover p95 latency above 2s (excluding generate)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
