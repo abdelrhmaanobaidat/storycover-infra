@@ -39,6 +39,11 @@ spec:
               memory: 64Mi
         grafana:
           enabled: false
+          # The Grafana Loki data source is defined in the monitoring stack (non-default);
+          # don't let loki-stack inject its own default one (it collides with Prometheus).
+          sidecar:
+            datasources:
+              enabled: false
         prometheus:
           enabled: false
   destination:
